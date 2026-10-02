@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", system-ui, sans-serif;
+  --color-brand: #2f4fbf;      /* headline blue */
+  --color-navy: #16267a;       /* dark blue text / panel */
+  --color-accent: #e39a3b;     /* orange */
+  --color-cream: #fffaf2;
+}
+
+body { @apply font-sans text-navy bg-white antialiased; }
