@@ -1,49 +1,47 @@
-import { useState } from 'react'
-import { NavLink, Link } from 'react-router-dom'
-import { Search, Menu, X } from 'lucide-react'
-import Logo from './Logo'
+import { useState } from "react";
+import { NavLink, Link } from "react-router-dom";
+import { Search, Menu, X, Globe } from "lucide-react";
+import Logo from "./Logo";
 
 const links = [
-  { label: 'Home', to: '/' },
-  { label: 'About Us', to: '/about' },
-  { label: 'Projects', to: '/projects' },
-  { label: 'Investor Relations', to: '/investor-relations' },
-  { label: 'Notices', to: '/notices' },
-  { label: 'Media', to: '/media' },
-  { label: 'Careers', to: '/careers' },
-  { label: 'Contact Us', to: '/contact' },
-]
+  { label: "Home", to: "/" },
+  { label: "About Us", to: "/about" },
+  { label: "Projects", to: "/projects" },
+  { label: "Investor Relations", to: "/investor-relations" },
+  { label: "Notices", to: "/notices" },
+  { label: "Media", to: "/media" },
+  { label: "Careers", to: "/careers" },
+  { label: "Contact Us", to: "/contact" },
+];
 
 export default function Navbar() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const closeMenu = () => {
-    setIsMenuOpen(false)
-  }
+    setIsMenuOpen(false);
+  };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-brand/10 bg-gradient-to-b from-[#f4f7ff] to-[#eaf0fd] shadow-sm">
-
+    <header className="sticky top-0 z-50 w-full border-b border-brand/10 bg-gradient-to-b from-[#f4f7ff] to-[#eaf0fd] shadow-sm">
       {/* Main Navbar */}
-      <div className="mx-auto flex h-[85px] max-w-[1400px] items-center justify-between px-6 lg:px-10">
-
-        {/* Logo */}
-        <Link to="/" onClick={closeMenu}>
+      <div className="mx-auto flex h-[85px] w-full max-w-[1400px] items-center justify-between px-4 md:px-6 lg:px-10 gap-4">
+        {/* Logo: shrink-0 ensures it NEVER squishes or hides */}
+        <Link to="/" onClick={closeMenu} className="shrink-0">
           <Logo />
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden items-center gap-8 text-[15px] font-medium text-brand lg:flex">
+        {/* Desktop Navigation: hidden on mobile, flex on md and up */}
+        <nav className="hidden md:flex items-center gap-4 text-[14px] lg:text-[15px] font-medium text-brand overflow-x-auto">
           {links.map(({ label, to }) => (
             <NavLink
               key={to}
               to={to}
-              end={to === '/'}
+              end={to === "/"}
               className={({ isActive }) =>
-                `border-b-2 py-2 ${
+                `border-b-2 py-2 whitespace-nowrap ${
                   isActive
-                    ? 'border-brand'
-                    : 'border-transparent hover:opacity-70'
+                    ? "border-brand"
+                    : "border-transparent hover:opacity-70"
                 }`
               }
             >
@@ -53,98 +51,56 @@ export default function Navbar() {
         </nav>
 
         {/* Desktop Right Side */}
-        <div className="hidden items-center gap-4 text-brand lg:flex">
-
-          {/* Search */}
-          <Search size={18} />
-
-          {/* Divider */}
+        <div className="hidden lg:flex shrink-0 items-center gap-4 text-brand">
+          <button
+            type="button"
+            className="hover:opacity-70 transition-opacity"
+            aria-label="Search"
+          >
+            <Search size={18} />
+          </button>
           <span className="h-8 w-px bg-brand/30" />
-
-          {/* Language Selector */}
-          <div className="flex items-center gap-3 rounded-full border border-brand/30 px-5 py-2 text-xs">
-            <Search size={14} />
-
-            <span className="font-medium">
-              ENG
-            </span>
-
+          <div className="flex items-center gap-3 rounded-full border border-brand/30 px-4 py-2 text-xs">
+            <Globe size={14} />
+            <span className="font-medium">ENG</span>
             <span className="h-4 w-px bg-brand/40" />
-
-            <span>
-              नेपाली
-            </span>
+            <span>नेपाली</span>
           </div>
         </div>
 
-        {/* Mobile Menu Button */}
+        {/* Mobile Menu Button: Only shows on very small screens (below md) */}
         <button
           type="button"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="rounded-md p-2 text-brand lg:hidden"
+          className="rounded-md p-2 text-brand md:hidden shrink-0"
           aria-label="Toggle navigation menu"
-          aria-expanded={isMenuOpen}
         >
-          {isMenuOpen ? (
-            <X size={28} />
-          ) : (
-            <Menu size={28} />
-          )}
+          {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
         </button>
-
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu Dropdown */}
       {isMenuOpen && (
-        <div className="border-t border-brand/10 bg-gradient-to-b from-[#f4f7ff] to-[#eaf0fd] px-6 pb-6 lg:hidden">
-
-          {/* Mobile Navigation Links */}
+        <div className="w-full border-t border-brand/10 bg-[#f4f7ff] px-6 pb-6 md:hidden">
           <nav className="flex flex-col">
-
             {links.map(({ label, to }) => (
               <NavLink
                 key={to}
                 to={to}
-                end={to === '/'}
+                end={to === "/"}
                 onClick={closeMenu}
                 className={({ isActive }) =>
                   `border-b border-brand/10 py-4 text-[15px] font-medium text-brand ${
-                    isActive
-                      ? 'font-semibold'
-                      : 'hover:opacity-70'
+                    isActive ? "font-semibold" : "hover:opacity-70"
                   }`
                 }
               >
                 {label}
               </NavLink>
             ))}
-
           </nav>
-
-          {/* Mobile Language Selector */}
-          <div className="mt-5 flex justify-center">
-
-            <div className="flex items-center gap-3 rounded-full border border-brand/30 px-5 py-2 text-xs text-brand">
-
-              <Search size={14} />
-
-              <span className="font-medium">
-                ENG
-              </span>
-
-              <span className="h-4 w-px bg-brand/40" />
-
-              <span>
-                नेपाली
-              </span>
-
-            </div>
-
-          </div>
-
         </div>
       )}
-
     </header>
-  )
+  );
 }
