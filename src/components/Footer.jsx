@@ -14,7 +14,7 @@ export default function Footer() {
               <path d="M32 30V14M22 30l-6-12M42 30l6-12M14 30l-8-6M50 30l8-6" />
             </g>
           </svg>
-          <p className="mt-1 text-4xl font-semibold tracking-tight">ARRI⚡</p>
+          <p className="mt-1 text-4xl font-semibold tracking-tight">ARRIS</p>
           <p className="mt-2 text-[15px]">Arris Energy Limited</p>
           <p className="text-xl">एरिस इनर्जी लिमिटेड</p>
         </div>
