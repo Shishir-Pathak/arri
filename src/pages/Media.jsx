@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Newspaper, Camera, Play, Image as ImageIcon, X, Download, FileText, Calendar,
-  ExternalLink, Mail, Phone, MapPin, ArrowRight, Copy, Check,
+  ExternalLink, Mail, Phone, MapPin, ArrowRight,
 } from 'lucide-react'
 
 /* ---------------- DATA (edit text here) ---------------- */
@@ -88,22 +88,11 @@ const sortedNews = [...news].sort((a, b) => (b.date || '').localeCompare(a.date 
 export default function Media() {
   const [tab, setTab] = useState('All')
   const [open, setOpen] = useState(null) // gallery item shown in lightbox
-  const [copied, setCopied] = useState(false)
 
   const photos = useMemo(
     () => gallery.filter((g) => tab === 'All' || g.category === tab),
     [tab]
   )
-
-  const copyText = async () => {
-    try {
-      await navigator.clipboard.writeText(boilerplate)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      /* clipboard not available */
-    }
-  }
 
   return (
     <div className="mx-auto max-w-[1200px] bg-white">
@@ -361,14 +350,6 @@ export default function Media() {
           <h2 className="mt-1 text-2xl font-bold text-brand">Company Description</h2>
           <Bar />
           <p className="mt-4 text-[12px] leading-5 text-navy/85">{boilerplate}</p>
-          <button
-            type="button"
-            onClick={copyText}
-            className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#eef3fc] px-4 py-2 text-[11px] font-semibold tracking-wide text-brand transition hover:bg-[#e3ecfb]"
-          >
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? 'COPIED' : 'COPY TEXT'}
-          </button>
         </div>
       </section>
 

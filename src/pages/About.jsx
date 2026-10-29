@@ -3,7 +3,7 @@ import { User, Zap, FileText, ArrowRight, MapPin, Phone, Mail } from 'lucide-rea
 
 /* ---------------- DATA (edit text here) ---------------- */
 const milestones = [
-  { title: '2075/04/06 B.S.', text: 'Original registration as Arris Energy Private Limited' },
+  { title: '22 July 2018', text: 'Original registration as Arris Energy Private Limited' },
   { title: '9.8 MW', text: 'Generation license granted for Luja Khola Cascade Hydropower Project' },
   { title: '13 July 2026', text: 'Conversion to public limited company (Arris Energy Limited)' },
   { title: '14 July 2026', text: 'Certificate of conversion issued by the Office of the Company Registrar' },

@@ -7,17 +7,7 @@ export default function Footer() {
     <footer className="bg-white text-brand">
       <div className="mx-auto grid max-w-[1400px] gap-8 px-6 py-10 md:grid-cols-2 lg:grid-cols-[1.1fr_1.3fr_1.2fr_1fr] lg:gap-0 lg:px-10">
         {/* brand */}
-        <div className="lg:pr-8">
-          <svg viewBox="0 0 64 64" className="h-14 w-14" fill="currentColor">
-            <path d="M32 4a28 28 0 0 1 28 28H4A28 28 0 0 1 32 4Z" />
-            <g stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
-              <path d="M32 30V14M22 30l-6-12M42 30l6-12M14 30l-8-6M50 30l8-6" />
-            </g>
-          </svg>
-          <p className="mt-1 text-4xl font-semibold tracking-tight">ARRIS</p>
-          <p className="mt-2 text-[15px]">Arris Energy Limited</p>
-          <p className="text-xl">एरिस इनर्जी लिमिटेड</p>
-        </div>
+       
 
         {/* quick links */}
         <div className="lg:border-l lg:border-brand/30 lg:px-8">
