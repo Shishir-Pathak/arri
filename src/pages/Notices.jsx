@@ -1,51 +1,29 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Megaphone, Calendar, Search, FileText, Download, Phone, Mail, MapPin,
   ArrowRight, Pin, Bell,
 } from 'lucide-react'
+import { useApi } from '../lib/useApi'
+import { fetchNotices, fetchNoticeCategories } from '../lib/endpoints'
 
-/* ---------------- DATA (edit text here) ---------------- */
-// date: 'YYYY-MM-DD' (use null if unknown)
-// file: '/docs/xyz.pdf' (file inside /public/docs) or null
-// Add a new notice by copying one line into the list. Newest dates show first automatically.
-const categories = ['All', 'Corporate', 'Share & IPO', 'Meetings', 'Regulatory']
+/* ---------------- FALLBACK DATA (If backend is down) ---------------- */
+const fallbackCategories = ['All', 'Corporate', 'Share & IPO', 'Meetings', 'Regulatory']
 
-const notices = [
+const fallbackNotices = [
   {
     date: '2026-07-14',
     category: 'Corporate',
     title: 'Certificate of Conversion Issued',
     text: 'The Office of the Company Registrar has issued the certificate of conversion of Arris Energy Private Limited into a public limited company.',
-    file: null,
+    file_url: null,
   },
   {
     date: '2026-07-13',
     category: 'Corporate',
     title: 'Conversion to Public Limited Company',
     text: 'Arris Energy Private Limited has been converted into a public limited company and is now known as Arris Energy Limited.',
-    file: null,
-  },
-  {
-    date: null,
-    category: 'Share & IPO',
-    title: 'Public Issue Notice',
-    text: 'To be updated',
-    file: null,
-  },
-  {
-    date: null,
-    category: 'Meetings',
-    title: 'Annual General Meeting Notice',
-    text: 'To be updated',
-    file: null,
-  },
-  {
-    date: null,
-    category: 'Regulatory',
-    title: 'Regulatory Disclosure',
-    text: 'To be updated',
-    file: null,
+    file_url: null,
   },
 ]
 
@@ -75,34 +53,49 @@ const formatDate = (d) =>
     ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     : 'Date to be updated'
 
-const sorted = [...notices].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-
 /* ---------------- PAGE ---------------- */
 export default function Notices() {
   const [active, setActive] = useState('All')
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return sorted.filter(
-      (n) =>
-        (active === 'All' || n.category === active) &&
-        (!q || n.title.toLowerCase().includes(q) || n.text.toLowerCase().includes(q))
-    )
-  }, [active, query])
+  // Debounce search to avoid spamming the API on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 300)
+    return () => clearTimeout(timer)
+  }, [query])
 
-  const latest = sorted[0]
+  // 1. Fetch Categories
+  const { data: apiCategories } = useApi(fetchNoticeCategories)
+  
+  // Build category list (Add 'All' to the front)
+  const categories = apiCategories 
+    ? ['All', ...apiCategories.map(c => c.name)]
+    : fallbackCategories
+
+  // Map active category name back to slug for the API request
+  const activeSlug = active === 'All' 
+    ? undefined 
+    : apiCategories?.find(c => c.name === active)?.slug
+
+  // 2. Fetch Notices (Server-side filtering)
+  const { data: noticesData, loading } = useApi(
+    () => fetchNotices({ 
+      category: activeSlug, 
+      search: debouncedQuery || undefined, 
+      ordering: '-date' 
+    }),
+    [activeSlug, debouncedQuery]
+  )
+
+  const displayNotices = noticesData?.results || (noticesData ? [] : fallbackNotices)
+  const latest = displayNotices.length > 0 ? displayNotices[0] : null
 
   return (
     <div className="mx-auto max-w-[1200px] bg-white">
       {/* ===== PAGE BANNER ===== */}
       <section className="relative aspect-[929/155] min-h-[160px] w-full overflow-hidden bg-[#e4eefc]">
-        <svg
-          viewBox="0 0 929 155"
-          preserveAspectRatio="xMaxYMax slice"
-          className="absolute inset-0 h-full w-full"
-          aria-hidden="true"
-        >
+        <svg viewBox="0 0 929 155" preserveAspectRatio="xMaxYMax slice" className="absolute inset-0 h-full w-full" aria-hidden="true">
           <defs>
             <linearGradient id="bannerSkyN" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stopColor="#dbe8fb" />
@@ -172,7 +165,7 @@ export default function Notices() {
             <p className="mt-1 flex items-center gap-2 text-[11px] text-navy/70">
               <Calendar size={12} /> {formatDate(latest.date)}
             </p>
-            <p className="mt-3 text-[12px] leading-5 text-navy/85">{latest.text}</p>
+            <p className="mt-3 text-[12px] leading-5 text-navy/85 line-clamp-3">{latest.text}</p>
           </div>
         )}
       </section>
@@ -214,10 +207,16 @@ export default function Notices() {
         </div>
 
         {/* list */}
-        <ul className="mt-6">
-          {filtered.map((n) => (
+        <ul className="mt-6 min-h-[200px]">
+          {loading && (
+            <li className="py-8 text-center text-[13px] text-navy/60">
+              Loading notices...
+            </li>
+          )}
+
+          {!loading && displayNotices.map((n, index) => (
             <li
-              key={n.title + n.date}
+              key={`${n.title}-${index}`}
               className="flex flex-col gap-3 border-b border-brand/15 py-4 last:border-0 sm:flex-row sm:items-center"
             >
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#e3ecfb] text-brand">
@@ -239,9 +238,9 @@ export default function Notices() {
                 </p>
               </div>
 
-              {n.file ? (
+              {n.file_url ? (
                 <a
-                  href={n.file}
+                  href={n.file_url}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 self-start rounded-full bg-[#eef3fc] px-4 py-2 text-[11px] font-semibold tracking-wide text-brand transition hover:bg-[#e3ecfb] sm:self-center"
@@ -254,7 +253,7 @@ export default function Notices() {
             </li>
           ))}
 
-          {filtered.length === 0 && (
+          {!loading && displayNotices.length === 0 && (
             <li className="rounded-xl bg-[#f1f6fd] p-8 text-center text-[13px] text-navy/70">
               No notices found. Try another category or search term.
             </li>
@@ -277,7 +276,7 @@ export default function Notices() {
           </div>
           <Link
             to="/investor-relations"
-            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy"
+            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy hover:bg-[#e5a840] transition-colors"
           >
             INVESTOR RELATIONS <ArrowRight size={14} />
           </Link>

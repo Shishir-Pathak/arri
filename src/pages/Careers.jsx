@@ -1,15 +1,16 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Briefcase, MapPin, Clock, ChevronDown, Mail, Phone, ArrowRight, Leaf, GraduationCap,
-  Users, TrendingUp, ShieldCheck, FileText, Search, UserCheck, Handshake,
+  Users, TrendingUp, ShieldCheck, FileText, Search, UserCheck, Handshake, AlertCircle, CheckCircle2, Loader2
 } from 'lucide-react'
+import { useApi } from '../lib/useApi'
+import { fetchOpenings, submitApplication } from '../lib/endpoints'
 
-/* ---------------- DATA (edit text here) ---------------- */
+/* ---------------- FALLBACK DATA ---------------- */
 const TBU = 'To be updated'
-const APPLY_EMAIL = 'energyarris@gmail.com'
 
-const reasons = [
+const fallbackReasons = [
   { icon: Leaf, title: 'Meaningful Work', text: 'Help harness Nepal’s river systems for clean, renewable energy' },
   { icon: TrendingUp, title: 'Growing Platform', text: 'Be part of a company expanding across hydropower, solar and wind' },
   { icon: GraduationCap, title: 'Technical Capability', text: 'Work in an environment that builds technical skills and expertise' },
@@ -18,7 +19,7 @@ const reasons = [
   { icon: Handshake, title: 'National Impact', text: 'Contribute to Nepal’s energy security and sustainable development' },
 ]
 
-const values = [
+const fallbackValues = [
   'Responsible development of natural resources',
   'Compliance and integrity',
   'Technical excellence',
@@ -26,40 +27,22 @@ const values = [
   'Respect for communities and environment',
 ]
 
-// SAMPLE openings: replace or delete. Set openings = [] to show the "no openings" message.
-const departments = ['All', 'Engineering', 'Finance & Admin', 'Operations']
-const openings = [
+const fallbackOpenings = [
   {
-    title: 'Civil Engineer (Sample)',
+    id: 1,
+    title: 'Civil Engineer',
+    slug: 'civil-engineer',
     department: 'Engineering',
     location: 'Solukhumbu (Project Site)',
-    type: 'Full-time',
-    deadline: null, // 'YYYY-MM-DD' or null
-    summary: TBU,
-    requirements: [TBU],
-  },
-  {
-    title: 'Accountant (Sample)',
-    department: 'Finance & Admin',
-    location: 'Kathmandu (Head Office)',
-    type: 'Full-time',
+    job_type_display: 'Full-time',
     deadline: null,
     summary: TBU,
     requirements: [TBU],
-  },
-  {
-    title: 'Site Operator (Sample)',
-    department: 'Operations',
-    location: 'Solukhumbu (Project Site)',
-    type: 'Full-time',
-    deadline: null,
-    summary: TBU,
-    requirements: [TBU],
-  },
+  }
 ]
 
 const steps = [
-  { icon: FileText, title: 'Apply', text: 'Send your CV and a short cover letter by email' },
+  { icon: FileText, title: 'Apply', text: 'Submit your CV and a short cover letter' },
   { icon: Search, title: 'Screening', text: 'Our team reviews applications against the role' },
   { icon: Users, title: 'Interview', text: 'Shortlisted candidates are invited to interview' },
   { icon: UserCheck, title: 'Offer', text: 'Selected candidates receive an offer and join the team' },
@@ -100,29 +83,94 @@ function NumList({ items, className = '' }) {
 const formatDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : null
 
-const applyLink = (title) =>
-  `mailto:${APPLY_EMAIL}?subject=${encodeURIComponent('Application: ' + title)}`
+const inputBase = 'w-full rounded-lg border border-brand/20 bg-white px-4 py-2 text-[12px] text-navy outline-none transition placeholder:text-navy/35 focus:border-brand focus:ring-2 focus:ring-brand/15'
 
 /* ---------------- PAGE ---------------- */
 export default function Careers() {
+  // Fetch Openings
+  const { data: openingsRes } = useApi(fetchOpenings)
+  const allOpenings = openingsRes?.results || fallbackOpenings
+
+  // State for filters
   const [dept, setDept] = useState('All')
   const [expanded, setExpanded] = useState(null)
 
+  // Application form state
+  const [applyingFor, setApplyingFor] = useState(null)
+  const [appForm, setAppForm] = useState({ full_name: '', email: '', phone: '', cover_letter: '', cv: null, website: '' })
+  const [appErrors, setAppErrors] = useState({})
+  const [appStatus, setAppStatus] = useState('idle') // idle | sending | success | error
+
+  // Compute departments dynamically based on fetched data
+  const departments = useMemo(() => {
+    const list = allOpenings.map(o => o.department).filter(Boolean)
+    return ['All', ...new Set(list)]
+  }, [allOpenings])
+
   const list = useMemo(
-    () => openings.filter((o) => dept === 'All' || o.department === dept),
-    [dept]
+    () => allOpenings.filter((o) => dept === 'All' || o.department === dept),
+    [dept, allOpenings]
   )
+
+  // Form handlers
+  const setField = (k) => (e) => {
+    const value = e.target.type === 'file' ? e.target.files[0] : e.target.value
+    setAppForm((f) => ({ ...f, [k]: value }))
+    if (appErrors[k]) setAppErrors((er) => ({ ...er, [k]: undefined }))
+  }
+
+  const handleApplyClick = (job) => {
+    setExpanded(job.slug)
+    setApplyingFor(job.slug)
+    // Reset form when switching jobs
+    setAppForm({ full_name: '', email: '', phone: '', cover_letter: '', cv: null, website: '' })
+    setAppErrors({})
+    setAppStatus('idle')
+  }
+
+  const submitApp = async (e) => {
+    e.preventDefault()
+    if (appForm.website) return // Honeypot
+
+    // Basic validation
+    const eObj = {}
+    if (!appForm.full_name) eObj.full_name = 'Required'
+    if (!appForm.email) eObj.email = 'Required'
+    if (!appForm.phone) eObj.phone = 'Required'
+    if (!appForm.cv) eObj.cv = 'CV is required'
+    
+    if (Object.keys(eObj).length > 0) {
+      setAppErrors(eObj)
+      return
+    }
+
+    setAppStatus('sending')
+    try {
+      await submitApplication({
+        opening: applyingFor,
+        full_name: appForm.full_name,
+        email: appForm.email,
+        phone: appForm.phone,
+        cover_letter: appForm.cover_letter,
+        cv: appForm.cv,
+        website: appForm.website
+      })
+      setAppStatus('success')
+    } catch (err) {
+      if (err.fields && Object.keys(err.fields).length > 0) {
+        setAppErrors(err.fields) // Backend validation errors
+        setAppStatus('idle')
+      } else {
+        setAppStatus('error')
+      }
+    }
+  }
 
   return (
     <div className="mx-auto max-w-[1200px] bg-white">
       {/* ===== PAGE BANNER ===== */}
       <section className="relative aspect-[929/155] min-h-[160px] w-full overflow-hidden bg-[#e4eefc]">
-        <svg
-          viewBox="0 0 929 155"
-          preserveAspectRatio="xMaxYMax slice"
-          className="absolute inset-0 h-full w-full"
-          aria-hidden="true"
-        >
+        <svg viewBox="0 0 929 155" preserveAspectRatio="xMaxYMax slice" className="absolute inset-0 h-full w-full" aria-hidden="true">
           <defs>
             <linearGradient id="bannerSkyC" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stopColor="#dbe8fb" />
@@ -181,16 +229,13 @@ export default function Careers() {
             solar and wind. We are looking for capable, committed people who want to contribute to
             Nepal’s energy security and sustainable development.
           </p>
-          <a
-            href="#openings"
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy"
-          >
+          <a href="#openings" className="mt-5 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy hover:bg-[#e5a840] transition-colors">
             VIEW OPENINGS <ArrowRight size={14} />
           </a>
         </div>
         <div className="rounded-2xl bg-[#f1f6fd] p-6 self-center">
           <Label>OUR VALUES</Label>
-          <NumList items={values} className="mt-2" />
+          <NumList items={fallbackValues} className="mt-2" />
         </div>
       </section>
 
@@ -199,7 +244,7 @@ export default function Careers() {
         <Label>WHY ARRIS ENERGY</Label>
         <h2 className="mt-1 text-3xl font-bold text-navy">Why Work With Us</h2>
         <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {reasons.map(({ icon: Icon, title, text }) => (
+          {fallbackReasons.map(({ icon: Icon, title, text }) => (
             <div key={title} className="flex gap-4 rounded-xl bg-white p-4 shadow-sm">
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border-2 border-accent text-accent">
                 <Icon size={22} />
@@ -224,7 +269,7 @@ export default function Careers() {
             <button
               key={d}
               type="button"
-              onClick={() => { setDept(d); setExpanded(null) }}
+              onClick={() => { setDept(d); setExpanded(null); setApplyingFor(null) }}
               className={`rounded-full px-4 py-1.5 text-[11px] font-semibold tracking-wide transition ${
                 dept === d ? 'bg-brand text-white' : 'bg-[#e3ecfb] text-brand hover:bg-[#d3e3f9]'
               }`}
@@ -236,12 +281,14 @@ export default function Careers() {
 
         <ul className="mt-6 space-y-3">
           {list.map((o) => {
-            const isOpen = expanded === o.title
+            const isOpen = expanded === o.slug
+            const isApplying = applyingFor === o.slug
+
             return (
-              <li key={o.title} className="rounded-xl border border-brand/15">
+              <li key={o.id} className="rounded-xl border border-brand/15">
                 <button
                   type="button"
-                  onClick={() => setExpanded(isOpen ? null : o.title)}
+                  onClick={() => { setExpanded(isOpen ? null : o.slug); setApplyingFor(null) }}
                   className="flex w-full items-center gap-4 p-4 text-left"
                   aria-expanded={isOpen}
                 >
@@ -255,32 +302,87 @@ export default function Careers() {
                         {o.department}
                       </span>
                       <span className="flex items-center gap-1"><MapPin size={12} />{o.location}</span>
-                      <span className="flex items-center gap-1"><Clock size={12} />{o.type}</span>
+                      <span className="flex items-center gap-1"><Clock size={12} />{o.job_type_display}</span>
                     </span>
                   </span>
                   <ChevronDown size={18} className={`shrink-0 text-brand transition ${isOpen ? 'rotate-180' : ''}`} />
                 </button>
 
-                {isOpen && (
+                {isOpen && !isApplying && (
                   <div className="border-t border-brand/15 px-4 pb-4 pt-3 sm:pl-[76px]">
                     <p className={`text-[12px] leading-5 ${o.summary === TBU ? 'italic text-navy/50' : 'text-navy/85'}`}>
                       {o.summary}
                     </p>
                     <p className="mt-3 text-[11px] font-semibold tracking-[0.15em] text-brand">REQUIREMENTS</p>
                     <ul className="mt-1 list-disc pl-5 text-[12px] leading-5 text-navy/85">
-                      {o.requirements.map((r) => (
-                        <li key={r} className={r === TBU ? 'italic text-navy/50' : ''}>{r}</li>
+                      {o.requirements?.map((r, i) => (
+                        <li key={i} className={r === TBU ? 'italic text-navy/50' : ''}>{r}</li>
                       ))}
                     </ul>
                     <p className="mt-3 text-[11px] text-navy/65">
                       Application deadline: {formatDate(o.deadline) || 'To be updated'}
                     </p>
-                    <a
-                      href={applyLink(o.title)}
-                      className="mt-4 inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2 text-[11px] font-semibold tracking-[0.15em] text-navy"
+                    <button
+                      onClick={() => handleApplyClick(o)}
+                      className="mt-4 inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2 text-[11px] font-semibold tracking-[0.15em] text-navy hover:bg-[#e5a840] transition-colors"
                     >
-                      APPLY BY EMAIL <Mail size={14} />
-                    </a>
+                      APPLY NOW <FileText size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {/* --- APPLICATION FORM --- */}
+                {isOpen && isApplying && (
+                  <div className="border-t border-brand/15 bg-[#f8fbff] px-4 pb-6 pt-4 sm:px-6">
+                    {appStatus === 'success' ? (
+                      <div className="text-center py-4">
+                        <CheckCircle2 size={32} className="mx-auto text-green-600 mb-2" />
+                        <h3 className="text-[15px] font-bold text-navy">Application Submitted!</h3>
+                        <p className="text-[12px] text-navy/75 mt-1">Thank you for applying. We will contact you if your profile matches our requirements.</p>
+                      </div>
+                    ) : (
+                      <form onSubmit={submitApp} className="space-y-3">
+                        <p className="text-[12px] font-bold text-navy mb-2">Apply for {o.title}</p>
+                        
+                        {/* Honeypot */}
+                        <input type="text" value={appForm.website} onChange={setField('website')} tabIndex="-1" autoComplete="off" className="absolute -left-[9999px] opacity-0" />
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <input type="text" placeholder="Full Name *" value={appForm.full_name} onChange={setField('full_name')} className={inputBase} />
+                            {appErrors.full_name && <span className="text-[10px] text-red-500">{appErrors.full_name[0] || appErrors.full_name}</span>}
+                          </div>
+                          <div>
+                            <input type="email" placeholder="Email Address *" value={appForm.email} onChange={setField('email')} className={inputBase} />
+                            {appErrors.email && <span className="text-[10px] text-red-500">{appErrors.email[0] || appErrors.email}</span>}
+                          </div>
+                        </div>
+                        
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <input type="tel" placeholder="Phone Number *" value={appForm.phone} onChange={setField('phone')} className={inputBase} />
+                            {appErrors.phone && <span className="text-[10px] text-red-500">{appErrors.phone[0] || appErrors.phone}</span>}
+                          </div>
+                          <div>
+                            <input type="file" accept=".pdf,.doc,.docx" onChange={setField('cv')} className="w-full text-[11px] text-navy file:mr-3 file:rounded-full file:border-0 file:bg-[#e3ecfb] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-brand hover:file:bg-[#d3e3f9]" />
+                            {appErrors.cv && <span className="text-[10px] text-red-500">{appErrors.cv[0] || appErrors.cv}</span>}
+                          </div>
+                        </div>
+
+                        <textarea rows="2" placeholder="Cover Letter (Optional)" value={appForm.cover_letter} onChange={setField('cover_letter')} className={inputBase} />
+
+                        {appStatus === 'error' && (
+                          <p className="text-[11px] text-red-600 flex items-center gap-1"><AlertCircle size={12} /> Something went wrong. Please try again.</p>
+                        )}
+
+                        <div className="flex items-center gap-3 mt-2">
+                          <button type="submit" disabled={appStatus === 'sending'} className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-[11px] font-semibold text-white hover:bg-navy disabled:opacity-50">
+                            {appStatus === 'sending' ? <><Loader2 size={14} className="animate-spin"/> SENDING...</> : 'SUBMIT APPLICATION'}
+                          </button>
+                          <button type="button" onClick={() => setApplyingFor(null)} className="text-[11px] text-navy/60 hover:text-navy font-semibold">Cancel</button>
+                        </div>
+                      </form>
+                    )}
                   </div>
                 )}
               </li>
@@ -313,28 +415,6 @@ export default function Careers() {
         </div>
       </section>
 
-      {/* ===== GENERAL APPLICATION ===== */}
-      <section className="border-b border-brand/15 bg-[#f1f6fd] px-6 py-8 lg:px-10">
-        <div className="flex flex-col items-start gap-4 md:flex-row md:items-center">
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 border-accent text-accent">
-            <FileText size={24} />
-          </span>
-          <div className="flex-1">
-            <Label>DON’T SEE A ROLE FOR YOU?</Label>
-            <p className="mt-1 text-[13px] leading-6 text-navy/85">
-              Send your CV and a short note about your skills and interests. We will keep it on file
-              for future openings.
-            </p>
-          </div>
-          <a
-            href={applyLink('General Application')}
-            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy"
-          >
-            SEND YOUR CV <Mail size={14} />
-          </a>
-        </div>
-      </section>
-
       {/* ===== CONTACT ===== */}
       <section className="px-6 py-8 lg:px-10">
         <Label>CAREER ENQUIRIES</Label>
@@ -354,10 +434,7 @@ export default function Careers() {
         </div>
 
         <div className="mt-8 flex flex-wrap items-center gap-4">
-          <Link
-            to="/about"
-            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy"
-          >
+          <Link to="/about" className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy hover:bg-[#e5a840] transition-colors">
             ABOUT THE COMPANY <ArrowRight size={14} />
           </Link>
           <Link to="/projects" className="text-[11px] font-semibold tracking-[0.15em] text-brand hover:underline">

@@ -3,11 +3,13 @@ import {
   Zap, ShieldCheck, Landmark, Network, Users, TrendingUp, FileText, Download,
   Phone, Mail, MapPin, ArrowRight, Info,
 } from 'lucide-react'
+import { useApi } from '../lib/useApi'
+import { fetchCapitalStructure, fetchPublicOffering, fetchFinancials, fetchDocuments, fetchPeople } from '../lib/endpoints'
 
-/* ---------------- DATA (edit text here) ---------------- */
+/* ---------------- FALLBACK DATA ---------------- */
 const TBU = 'To be updated'
 
-const highlights = [
+const fallbackHighlights = [
   { icon: Zap, title: 'Licensed Generation Asset', text: '9.8 MW generation license for the Luja Khola Cascade Hydropower Project' },
   { icon: Network, title: 'Grid-Connected Revenue Model', text: 'Power sold in coordination with Nepal Electricity Authority through PPAs' },
   { icon: TrendingUp, title: 'Diversified Growth Plan', text: 'Planned expansion into solar and wind to strengthen supply resilience' },
@@ -16,7 +18,7 @@ const highlights = [
   { icon: Users, title: 'Experienced Promoter Group', text: 'Twelve founding promoters and shareholders from across Nepal' },
 ]
 
-const capital = [
+const fallbackCapital = [
   ['Authorized Capital', 'NPR 30,00,00,000'],
   ['Issued Capital', 'NPR 30,00,00,000'],
   ['Face Value', 'NPR 100 per share'],
@@ -25,19 +27,17 @@ const capital = [
   ['Company Type', 'Public Limited Company'],
 ]
 
-// Indicative figures: 20% / 80% of NPR 30 crore at NPR 100 face value. Verify before publishing.
-const offering = [
+const fallbackOffering = [
   ['Offering Status', TBU],
   ['Public Allocation', '20% of issued capital'],
-  ['Indicative Public Shares', '60,00,000 shares (to be confirmed)'],
-  ['Indicative Public Amount', 'NPR 6,00,00,000 (to be confirmed)'],
   ['Face Value', 'NPR 100 per share'],
   ['Issue Manager', TBU],
-  ['Opening / Closing Date', TBU],
+  ['Opening Date', TBU],
+  ['Closing Date', TBU],
   ['Share Registrar', TBU],
 ]
 
-const financials = [
+const fallbackFinancials = [
   ['Total Revenue', TBU],
   ['Net Profit', TBU],
   ['Total Assets', TBU],
@@ -46,7 +46,7 @@ const financials = [
   ['Fiscal Year Reported', TBU],
 ]
 
-const governance = [
+const fallbackGovernance = [
   'Five-member Board of Directors',
   'Promoter-group, public-shareholder and independent representation',
   'At least one woman director',
@@ -54,16 +54,14 @@ const governance = [
   'Long-term institutional continuity',
 ]
 
-const documents = [
-  { title: 'Company Profile / Governance', note: 'PDF' },
-  { title: 'Prospectus', note: TBU },
-  { title: 'Annual Report', note: TBU },
-  { title: 'Financial Statements', note: TBU },
-  { title: 'Certificate of Conversion', note: 'Office of the Company Registrar' },
-  { title: 'Generation License', note: '9.8 MW' },
+const fallbackDocuments = [
+  { title: 'Company Profile / Governance', note: 'PDF', url: '#' },
+  { title: 'Prospectus', note: TBU, url: '#' },
+  { title: 'Annual Report', note: TBU, url: '#' },
+  { title: 'Certificate of Conversion', note: 'Office of the Company Registrar', url: '#' },
 ]
 
-const promoters = [
+const fallbackPromoters = [
   'Kunal Kayal', 'Kumar Kharel', 'Mukti Bodh Neupane', 'Dilliram Rimal',
   'Bhawana Kharel', 'Ridhika Bodh Neupane (Upadhyay)', 'Mohit Agrawal', 'Niraj Jalan',
   'Nitu Kayal', 'Nitin Jalan', 'Pankaj Kumar Sanghai', 'Satya Bhama Kayal',
@@ -92,7 +90,7 @@ function NumList({ items, className = '' }) {
   return (
     <ol className={className}>
       {items.map((t, i) => (
-        <li key={t} className="flex gap-6 border-b border-brand/15 py-2 text-[13px] text-navy/90 last:border-0">
+        <li key={`${t}-${i}`} className="flex gap-6 border-b border-brand/15 py-2 text-[13px] text-navy/90 last:border-0">
           <span className="w-6 font-semibold text-brand">{String(i + 1).padStart(2, '0')}</span>
           {t}
         </li>
@@ -107,7 +105,7 @@ function Table({ rows, className = '' }) {
       {rows.map(([k, v]) => (
         <div key={k} className="flex gap-4 border-b border-brand/15 py-2 text-[12px] last:border-0">
           <dt className="w-44 shrink-0 font-semibold text-navy">{k}</dt>
-          <dd className={v === TBU ? 'italic text-navy/50' : 'text-navy/85'}>{v}</dd>
+          <dd className={!v || v === TBU ? 'italic text-navy/50' : 'text-navy/85'}>{v || TBU}</dd>
         </div>
       ))}
     </dl>
@@ -116,16 +114,67 @@ function Table({ rows, className = '' }) {
 
 /* ---------------- PAGE ---------------- */
 export default function InvestorRelations() {
+  // Fetch API Data
+  const { data: capitalData } = useApi(fetchCapitalStructure)
+  const { data: offeringData } = useApi(fetchPublicOffering)
+  const { data: financialsData } = useApi(fetchFinancials)
+  const { data: documentsData } = useApi(() => fetchDocuments('investor'))
+  const { data: peopleData } = useApi(() => fetchPeople({ is_promoter: true }))
+
+  // --- Process Data ---
+  
+  // Capital Structure
+  const promoterPct = capitalData?.promoter_shares_percent ?? 80
+  const publicPct = capitalData?.public_shares_percent ?? 20
+  const dashLength = (promoterPct / 100) * 238.76 // circumference for r=38
+
+  const capitalRows = capitalData ? [
+    ['Authorized Capital', `NPR ${capitalData.authorized_capital}`],
+    ['Issued Capital', `NPR ${capitalData.issued_capital}`],
+    ['Paid Up Capital', `NPR ${capitalData.paid_up_capital}`],
+    ['Face Value', `NPR ${capitalData.face_value_per_share} per share`],
+    ['Promoter Group', `${promoterPct}%`],
+    ['Public / IPO Allocation', `${publicPct}%`],
+    ['Company Type', 'Public Limited Company'],
+  ] : fallbackCapital
+
+  // Public Offering
+  const offeringRows = offeringData ? [
+    ['Offering Status', offeringData.status_display || offeringData.status],
+    ['Public Allocation', `${publicPct}% of issued capital`],
+    ['Face Value', `NPR ${capitalData?.face_value_per_share || 100} per share`],
+    ['Issue Manager', offeringData.issue_manager],
+    ['Opening Date', offeringData.opening_date],
+    ['Closing Date', offeringData.closing_date],
+    ['Share Registrar', offeringData.share_registrar],
+  ] : fallbackOffering
+
+  // Financials (Get latest year)
+  const latestFin = financialsData?.[0]
+  const financialRows = latestFin ? [
+    ['Fiscal Year Reported', latestFin.fiscal_year],
+    ['Total Revenue', `NPR ${latestFin.total_revenue}`],
+    ['Net Profit', `NPR ${latestFin.net_profit}`],
+    ['Total Assets', `NPR ${latestFin.total_assets}`],
+    ['Net Worth', `NPR ${latestFin.net_worth}`],
+    ['Earnings Per Share', `NPR ${latestFin.earnings_per_share}`],
+  ] : fallbackFinancials
+
+  // Documents & Promoters
+  const documentsList = documentsData?.length > 0 ? documentsData : fallbackDocuments
+  const promotersList = peopleData?.length > 0 ? peopleData.map(p => p.name) : fallbackPromoters
+
+  // Overview Stats
+  const statsCapacity = '9.8 MW'
+  const statsCapital = capitalData ? `NPR ${capitalData.issued_capital.split('.')[0]}` : 'NPR 30 Cr'
+  const statsFaceValue = capitalData ? `NPR ${capitalData.face_value_per_share.split('.')[0]}` : 'NPR 100'
+  const statsPublic = `${publicPct}%`
+
   return (
     <div className="mx-auto max-w-[1200px] bg-white">
       {/* ===== PAGE BANNER ===== */}
       <section className="relative aspect-[929/155] min-h-[160px] w-full overflow-hidden bg-[#e4eefc]">
-        <svg
-          viewBox="0 0 929 155"
-          preserveAspectRatio="xMaxYMax slice"
-          className="absolute inset-0 h-full w-full"
-          aria-hidden="true"
-        >
+        <svg viewBox="0 0 929 155" preserveAspectRatio="xMaxYMax slice" className="absolute inset-0 h-full w-full" aria-hidden="true">
           <defs>
             <linearGradient id="bannerSkyI" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stopColor="#dbe8fb" />
@@ -193,13 +242,13 @@ export default function InvestorRelations() {
 
         <div className="grid grid-cols-2 gap-4 self-center">
           {[
-            ['9.8 MW', 'Licensed Capacity'],
-            ['NPR 30 Cr', 'Issued Capital'],
-            ['NPR 100', 'Face Value / Share'],
-            ['20%', 'Public Allocation'],
+            [statsCapacity, 'Licensed Capacity'],
+            [statsCapital, 'Issued Capital'],
+            [statsFaceValue, 'Face Value / Share'],
+            [statsPublic, 'Public Allocation'],
           ].map(([v, l]) => (
             <div key={l} className="rounded-xl bg-[#f1f6fd] p-4 text-center">
-              <p className="text-2xl font-bold text-brand">{v}</p>
+              <p className="text-xl font-bold text-brand">{v}</p>
               <p className="mt-1 text-[11px] text-navy/75">{l}</p>
               <span className="mx-auto mt-2 block h-[2px] w-6 bg-accent" />
             </div>
@@ -212,7 +261,7 @@ export default function InvestorRelations() {
         <Label>INVESTMENT HIGHLIGHTS</Label>
         <h2 className="mt-1 text-3xl font-bold text-navy">Why Invest in Arris Energy</h2>
         <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {highlights.map(({ icon: Icon, title, text }) => (
+          {fallbackHighlights.map(({ icon: Icon, title, text }) => (
             <div key={title} className="flex gap-4 rounded-xl bg-white p-4 shadow-sm">
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border-2 border-accent text-accent">
                 <Icon size={22} />
@@ -236,7 +285,8 @@ export default function InvestorRelations() {
             <div className="relative h-36 w-36 shrink-0">
               <svg viewBox="0 0 100 100" className="-rotate-90">
                 <circle cx="50" cy="50" r="38" fill="none" stroke="#f7c35b" strokeWidth="16" />
-                <circle cx="50" cy="50" r="38" fill="none" stroke="#1d3f9a" strokeWidth="16" strokeDasharray="191 239" />
+                {/* Dynamic strokeDasharray based on promoter percentage */}
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#1d3f9a" strokeWidth="16" strokeDasharray={`${dashLength} 238.76`} />
               </svg>
               <div className="absolute inset-0 grid place-items-center text-center text-[10px] leading-3 text-navy">
                 <span><b className="block text-lg leading-5">100%</b>Total<br />Shareholding</span>
@@ -244,24 +294,25 @@ export default function InvestorRelations() {
             </div>
             <ul className="space-y-6 text-xs text-navy/80">
               <li className="flex gap-2"><span className="mt-1 h-3.5 w-3.5 rounded-full bg-[#1d3f9a]" />
-                <span><b className="block text-lg text-navy">80%</b>Promoter Group</span></li>
+                <span><b className="block text-lg text-navy">{promoterPct}%</b>Promoter Group</span></li>
               <li className="flex gap-2"><span className="mt-1 h-3.5 w-3.5 rounded-full bg-[#f7c35b]" />
-                <span><b className="block text-lg text-navy">20%</b>Public / IPO Allocation</span></li>
+                <span><b className="block text-lg text-navy">{publicPct}%</b>Public / IPO Allocation</span></li>
             </ul>
           </div>
-          <Table rows={capital} className="mt-6" />
+          <Table rows={capitalRows} className="mt-6" />
         </div>
 
         <div className="px-6 py-8 lg:px-10">
           <Label>PUBLIC OFFERING</Label>
           <h2 className="mt-1 text-2xl font-bold text-brand">Offer Information</h2>
           <Bar />
-          <Table rows={offering} className="mt-4" />
-          <p className="mt-3 flex gap-2 text-[10px] leading-4 text-navy/60">
-            <Info size={12} className="mt-0.5 shrink-0" />
-            Indicative figures are calculated from the stated 20% allocation and are subject to the
-            final approved offer terms.
-          </p>
+          <Table rows={offeringRows} className="mt-4" />
+          {offeringData?.note && (
+            <p className="mt-3 flex gap-2 text-[10px] leading-4 text-navy/60">
+              <Info size={12} className="mt-0.5 shrink-0" />
+              {offeringData.note}
+            </p>
+          )}
         </div>
       </section>
 
@@ -271,13 +322,13 @@ export default function InvestorRelations() {
           <Label>FINANCIAL INFORMATION</Label>
           <h2 className="mt-1 text-2xl font-bold text-brand">Financial Snapshot</h2>
           <Bar />
-          <Table rows={financials} className="mt-4" />
+          <Table rows={financialRows} className="mt-4" />
         </div>
         <div className="px-6 py-8 lg:px-10">
           <Label>CORPORATE GOVERNANCE</Label>
           <h2 className="mt-1 text-2xl font-bold text-brand">Board &amp; Oversight</h2>
           <Bar />
-          <NumList items={governance} className="mt-4" />
+          <NumList items={fallbackGovernance} className="mt-4" />
         </div>
       </section>
 
@@ -287,8 +338,8 @@ export default function InvestorRelations() {
         <h2 className="mt-1 text-2xl font-bold text-brand">Our Founding Promoters &amp; Shareholders</h2>
         <Bar />
         <ul className="mt-4 grid gap-x-10 sm:grid-cols-2 lg:grid-cols-3">
-          {promoters.map((name, i) => (
-            <li key={name} className="flex gap-3 border-b border-brand/10 py-2 text-[12px] text-navy/85">
+          {promotersList.map((name, i) => (
+            <li key={`${name}-${i}`} className="flex gap-3 border-b border-brand/10 py-2 text-[12px] text-navy/85">
               <span className="w-6 font-semibold text-brand">{String(i + 1).padStart(2, '0')}</span>
               {name}
             </li>
@@ -301,10 +352,12 @@ export default function InvestorRelations() {
         <Label>DOWNLOADS</Label>
         <h2 className="mt-1 text-3xl font-bold text-navy">Investor Documents</h2>
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {documents.map((d) => (
+          {documentsList.map((d, i) => (
             <a
-              key={d.title}
-              href="#"
+              key={`${d.title}-${i}`}
+              href={d.url}
+              target="_blank"
+              rel="noreferrer"
               className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm transition hover:shadow-md"
             >
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#e3ecfb] text-brand">
@@ -312,15 +365,14 @@ export default function InvestorRelations() {
               </span>
               <span className="flex-1 text-[12px] font-semibold text-navy">
                 {d.title}
-                <span className={`block text-[10px] font-normal ${d.note === TBU ? 'italic text-navy/50' : 'text-navy/70'}`}>
-                  {d.note}
+                <span className={`block text-[10px] font-normal ${!d.note || d.note === TBU ? 'italic text-navy/50' : 'text-navy/70'}`}>
+                  {d.note || TBU}
                 </span>
               </span>
               <Download size={16} className="text-brand" />
             </a>
           ))}
         </div>
-        {/* Replace href="#" with e.g. "/docs/company-profile.pdf" (files in /public/docs) */}
       </section>
 
       {/* ===== INVESTOR CONTACT ===== */}
@@ -344,7 +396,7 @@ export default function InvestorRelations() {
         <div className="mt-8 flex flex-wrap items-center gap-4">
           <Link
             to="/projects"
-            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy"
+            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy hover:bg-[#e5a840] transition-colors"
           >
             VIEW OUR PROJECT <ArrowRight size={14} />
           </Link>

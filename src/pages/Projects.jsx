@@ -1,41 +1,43 @@
 import { Link } from 'react-router-dom'
 import { Zap, MapPin, Waves, Mountain, ArrowRight, Phone, Mail, CheckCircle2, Circle, Sun, Wind } from 'lucide-react'
+import { useApi } from '../lib/useApi'
+import { fetchProjects, fetchProject } from '../lib/endpoints'
 
-/* ---------------- DATA (edit text here) ---------------- */
-const facts = [
+/* ---------------- FALLBACK DATA (If backend is down) ---------------- */
+const fallbackFacts = [
   { icon: Zap, label: 'Licensed Capacity', value: '9.8 MW' },
   { icon: Waves, label: 'Project Type', value: 'Run-of-River (Cascade)' },
   { icon: MapPin, label: 'District', value: 'Solukhumbu' },
   { icon: Mountain, label: 'Province', value: 'Koshi Province' },
 ]
 
+const fallbackDetails = [
+  { label: 'Project Name', value: 'Luja Khola Cascade Hydropower Project' },
+  { label: 'Licensee', value: 'Arris Energy Limited' },
+  { label: 'Generation License', value: '9.8 MW' },
+  { label: 'Project Type', value: 'Run-of-River (Cascade)' },
+  { label: 'Location', value: 'Khumbu Pasanglhamu Rural Municipality–2' },
+  { label: 'District / Province', value: 'Solukhumbu / Koshi Province' },
+  { label: 'Water Source', value: 'Tailrace discharge of upstream Luja Khola Hydropower Project' },
+  { label: 'Gross Head', value: 'To be updated' },
+  { label: 'Design Discharge', value: 'To be updated' },
+  { label: 'Power Purchaser', value: 'Nepal Electricity Authority (NEA)' },
+]
+
+const fallbackStages = [
+  { title: 'Generation License', text: '9.8 MW license granted', state: 'done' },
+  { title: 'License Transfer', text: 'Inherited by Arris Energy Limited after conversion', state: 'done' },
+  { title: 'Financial Closure', text: 'To be updated', state: 'current' },
+  { title: 'Construction', text: 'To be updated', state: 'next' },
+  { title: 'Commercial Operation', text: 'To be updated', state: 'next' },
+]
+
+/* ---------------- STATIC DATA ---------------- */
 const cascadeSteps = [
   { title: 'Upstream Project', text: 'Luja Khola Hydropower Project generates electricity first' },
   { title: 'Tailrace Discharge', text: 'Water released from the upstream powerhouse is reused' },
   { title: 'Cascade Project', text: 'Our 9.8 MW project generates additional clean power' },
   { title: 'National Grid', text: 'Electricity delivered in coordination with Nepal Electricity Authority' },
-]
-
-const details = [
-  ['Project Name', 'Luja Khola Cascade Hydropower Project'],
-  ['Licensee', 'Arris Energy Limited'],
-  ['Generation License', '9.8 MW'],
-  ['Project Type', 'Run-of-River (Cascade)'],
-  ['Location', 'Khumbu Pasanglhamu Rural Municipality–2'],
-  ['District / Province', 'Solukhumbu / Koshi Province'],
-  ['Water Source', 'Tailrace discharge of upstream Luja Khola Hydropower Project'],
-  ['Gross Head', 'To be updated'],
-  ['Design Discharge', 'To be updated'],
-  ['Power Purchaser', 'Nepal Electricity Authority (NEA)'],
-]
-
-// status: 'done' | 'current' | 'next'
-const progress = [
-  { title: 'Generation License', text: '9.8 MW license granted', status: 'done' },
-  { title: 'License Transfer', text: 'Inherited by Arris Energy Limited after conversion', status: 'done' },
-  { title: 'Financial Closure', text: 'To be updated', status: 'current' },
-  { title: 'Construction', text: 'To be updated', status: 'next' },
-  { title: 'Commercial Operation', text: 'To be updated', status: 'next' },
 ]
 
 const benefits = [
@@ -86,6 +88,36 @@ function NumList({ items, className = '' }) {
 
 /* ---------------- PAGE ---------------- */
 export default function Projects() {
+  // 1. Fetch the list of projects to find the Principal one
+  const { data: projectsData } = useApi(fetchProjects)
+  const principalSlug = projectsData?.results?.find(p => p.is_principal)?.slug || projectsData?.results?.[0]?.slug
+
+  // 2. Fetch the detailed info for that specific project
+  const { data: project, loading, error } = useApi(
+    () => principalSlug ? fetchProject(principalSlug) : Promise.resolve(null),
+    [principalSlug]
+  )
+
+  if (loading) {
+    return <div className="text-center py-20 text-xl font-semibold">Loading project details...</div>;
+  }
+
+  // Use API data if available, otherwise use fallback
+  const displayName = project?.name || 'Luja Khola Cascade Hydropower Project'
+  const displaySummary = project?.summary || 'Arris Energy Limited holds a generation license for the 9.8 MW Luja Khola Cascade Hydropower Project, a run-of-river project located in Khumbu Pasanglhamu Rural Municipality–2, Solukhumbu District, Koshi Province.'
+  const displayDescription = project?.description || "The project will utilize the tailrace discharge from the upstream Luja Khola Hydropower Project and will generate clean, renewable electricity to contribute to Nepal's growing energy demand."
+  
+  // Build the Key Facts array dynamically from API
+  const facts = project ? [
+    { icon: Zap, label: 'Licensed Capacity', value: project.capacity_display },
+    { icon: Waves, label: 'Project Type', value: project.project_type },
+    { icon: MapPin, label: 'District', value: project.district },
+    { icon: Mountain, label: 'Province', value: project.province },
+  ] : fallbackFacts
+
+  const details = project?.details?.length > 0 ? project.details : fallbackDetails
+  const progress = project?.stages?.length > 0 ? project.stages : fallbackStages
+
   return (
     <div className="mx-auto max-w-[1200px] bg-white">
       {/* ===== PAGE BANNER ===== */}
@@ -147,23 +179,18 @@ export default function Projects() {
       <section className="grid gap-8 border-b border-brand/15 px-6 py-8 lg:grid-cols-2 lg:px-10">
         <div>
           <Label>PRINCIPAL PROJECT</Label>
-          <h2 className="mt-1 text-3xl font-bold text-navy">Luja Khola Cascade Hydropower Project</h2>
+          <h2 className="mt-1 text-3xl font-bold text-navy">{displayName}</h2>
           <Bar />
           <p className="mt-4 text-[13px] leading-6 text-navy/85">
-            Arris Energy Limited holds a generation license for the 9.8 MW Luja Khola Cascade
-            Hydropower Project, a run-of-river project located in Khumbu Pasanglhamu Rural
-            Municipality–2, Solukhumbu District, Koshi Province.
+            {displaySummary}
           </p>
           <p className="mt-3 text-[13px] leading-6 text-navy/85">
-            The project will utilize the tailrace discharge from the upstream Luja Khola Hydropower
-            Project and will generate clean, renewable electricity to contribute to Nepal's growing
-            energy demand.
+            {displayDescription}
           </p>
         </div>
-        {/* put project.jpg inside the /public folder */}
         <div
           className="min-h-[240px] rounded-2xl bg-cover bg-center shadow"
-          style={{ backgroundImage: "url('/project.jpg'), linear-gradient(135deg,#9db8dd,#4d7bb8)" }}
+          style={{ backgroundImage: `url(${project?.image || '/project.jpg'}), linear-gradient(135deg,#9db8dd,#4d7bb8)` }}
         />
       </section>
 
@@ -208,12 +235,17 @@ export default function Projects() {
           <h2 className="mt-1 text-2xl font-bold text-brand">Technical &amp; Licensing Summary</h2>
           <Bar />
           <dl className="mt-4">
-            {details.map(([k, v]) => (
-              <div key={k} className="flex gap-4 border-b border-brand/15 py-2 text-[12px] last:border-0">
-                <dt className="w-36 shrink-0 font-semibold text-navy">{k}</dt>
-                <dd className={v === 'To be updated' ? 'italic text-navy/50' : 'text-navy/85'}>{v}</dd>
-              </div>
-            ))}
+            {details.map((item, index) => {
+              // Handle API object {label, value} vs UI array [key, value]
+              const label = item.label || item[0];
+              const value = item.value || item[1];
+              return (
+                <div key={index} className="flex gap-4 border-b border-brand/15 py-2 text-[12px] last:border-0">
+                  <dt className="w-36 shrink-0 font-semibold text-navy">{label}</dt>
+                  <dd className={value === 'To be updated' ? 'italic text-navy/50' : 'text-navy/85'}>{value}</dd>
+                </div>
+              )
+            })}
           </dl>
         </div>
 
@@ -222,19 +254,23 @@ export default function Projects() {
           <h2 className="mt-1 text-2xl font-bold text-brand">Development Progress</h2>
           <Bar />
           <ol className="mt-4 space-y-4">
-            {progress.map((p) => (
-              <li key={p.title} className="flex gap-3">
-                {p.status === 'done' ? (
-                  <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-brand" />
-                ) : (
-                  <Circle size={18} className={`mt-0.5 shrink-0 ${p.status === 'current' ? 'text-accent' : 'text-brand/30'}`} />
-                )}
-                <div>
-                  <p className="text-[13px] font-semibold text-navy">{p.title}</p>
-                  <p className={`text-[11px] ${p.text === 'To be updated' ? 'italic text-navy/50' : 'text-navy/75'}`}>{p.text}</p>
-                </div>
-              </li>
-            ))}
+            {progress.map((p, index) => {
+              // Handle API {state} vs UI {status}
+              const state = p.state || p.status || 'next';
+              return (
+                <li key={index} className="flex gap-3">
+                  {state === 'done' ? (
+                    <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-brand" />
+                  ) : (
+                    <Circle size={18} className={`mt-0.5 shrink-0 ${state === 'current' ? 'text-accent' : 'text-brand/30'}`} />
+                  )}
+                  <div>
+                    <p className="text-[13px] font-semibold text-navy">{p.title}</p>
+                    <p className={`text-[11px] ${p.text === 'To be updated' ? 'italic text-navy/50' : 'text-navy/75'}`}>{p.text}</p>
+                  </div>
+                </li>
+              )
+            })}
           </ol>
         </div>
       </section>
@@ -279,7 +315,7 @@ export default function Projects() {
           </div>
           <Link
             to="/about"
-            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy"
+            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy hover:bg-[#e5a840] transition-colors"
           >
             ABOUT THE COMPANY <ArrowRight size={14} />
           </Link>

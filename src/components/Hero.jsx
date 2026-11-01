@@ -1,33 +1,4 @@
-import { useEffect, useState } from 'react'
-import { ArrowRight, Zap, Leaf, Droplets, Mountain } from 'lucide-react'
-
-/* Counts up to `end` once on mount (skipped if the user prefers reduced motion) */
-function CountUp({ end = 9.8, duration = 1600, decimals = 1 }) {
-  const [value, setValue] = useState(0)
-
-  useEffect(() => {
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    if (reduce) {
-      setValue(end)
-      return
-    }
-    let raf
-    const start = performance.now()
-    const tick = (now) => {
-      const p = Math.min((now - start) / duration, 1)
-      const eased = 1 - Math.pow(1 - p, 3)
-      setValue(end * eased)
-      if (p < 1) raf = requestAnimationFrame(tick)
-    }
-    const t = setTimeout(() => (raf = requestAnimationFrame(tick)), 800)
-    return () => {
-      clearTimeout(t)
-      cancelAnimationFrame(raf)
-    }
-  }, [end, duration])
-
-  return <>{value.toFixed(decimals)}</>
-}
+import { ArrowRight, Zap, Leaf, Users, Mountain } from 'lucide-react'
 
 /* Frosted icon tile shared by every card */
 const iconTile =
@@ -46,7 +17,15 @@ const card =
   'hover:-translate-y-1.5 hover:border-white/35 hover:bg-[#101d5c]/65 ' +
   'hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_30px_64px_-20px_rgba(6,12,45,0.9)]'
 
-export default function Hero() {
+export default function Hero({ slides = [], stats = [] }) {
+  // Use the first slide from the API, with a fallback just in case
+  const slide = slides[0] || {
+    title: "Powering a cleaner Nepal",
+    subtitle: "Harnessing Nepal's natural resources for a sustainable and prosperous future.",
+    button_text: "LEARN MORE",
+    button_link: "#"
+  };
+
   return (
     <section
       className="relative isolate flex min-h-[640px] w-full flex-col justify-center overflow-hidden antialiased
@@ -84,7 +63,6 @@ export default function Hero() {
           80%, 100% { transform: scale(2.6); opacity: 0; }
         }
 
-        /* fill-mode: backwards -> the entrance keeps hover transforms working afterwards */
         .hero-rise  { animation: hero-rise .85s cubic-bezier(.22,1,.36,1) backwards; }
         .hero-line  { transform-origin: left; animation: hero-line .9s 1s cubic-bezier(.22,1,.36,1) backwards; }
         .hero-drift { animation: hero-drift 14s ease-in-out infinite; }
@@ -94,7 +72,6 @@ export default function Hero() {
         .hero-float { animation: hero-float 6s ease-in-out infinite; }
         .hero-ping  { animation: hero-ping 2s ease-out infinite; }
 
-        /* glass card hover sheen */
         .glass-card::after {
           content: '';
           position: absolute;
@@ -198,32 +175,30 @@ export default function Hero() {
             </span>
           </p>
 
+          {/* TITLE FROM API */}
           <h1
             className="hero-rise mt-8 break-words text-4xl font-normal uppercase leading-[0.94] tracking-[-0.015em] text-brand [text-shadow:0_1px_0_rgba(255,255,255,0.28)] sm:text-5xl md:mt-10 md:text-6xl lg:text-7xl xl:text-[68px]"
             style={{ animationDelay: '0.25s' }}
           >
-            Powering
-            <br />
-            <span className="text-accent">a cleaner</span>
-            <br />
-            Nepal
+            {slide.title}
           </h1>
 
+          {/* SUBTITLE FROM API */}
           <p
             className="hero-rise mt-6 max-w-sm text-base leading-snug text-navy/90 md:text-lg"
             style={{ animationDelay: '0.45s' }}
           >
-            Harnessing Nepal's natural resources for a sustainable and prosperous future.
+            {slide.subtitle}
           </p>
 
+          {/* BUTTON FROM API */}
           <a
-            href="#"
+            href={slide.button_link}
             className="hero-rise group relative mt-10 inline-flex items-center gap-4 overflow-hidden rounded-full bg-navy py-2 pl-6 pr-2 text-[11px] font-medium tracking-[0.2em] text-white ring-1 ring-white/25 shadow-[0_16px_38px_-14px_rgba(9,17,60,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_26px_50px_-16px_rgba(9,17,60,1)] md:mt-12 md:text-xs"
             style={{ animationDelay: '0.65s' }}
           >
-            {/* shine sweep */}
             <span className="pointer-events-none absolute inset-0 -translate-x-full bg-[linear-gradient(100deg,transparent,rgba(255,255,255,0.35),transparent)] transition-transform duration-700 ease-out group-hover:translate-x-full" />
-            <span className="relative whitespace-nowrap">LEARN MORE</span>
+            <span className="relative whitespace-nowrap uppercase">{slide.button_text}</span>
             <span className="relative grid h-10 w-10 place-items-center rounded-full bg-white text-navy shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_6px_16px_-6px_rgba(0,0,0,0.5)] transition-transform duration-300 group-hover:translate-x-1 md:h-11 md:w-11">
               <ArrowRight size={16} />
             </span>
@@ -236,12 +211,11 @@ export default function Hero() {
           <div className={card + ' col-span-2'} style={{ animationDelay: '0.5s' }}>
             <div className="relative flex items-start justify-between gap-4">
               <div>
-                <p className="flex items-baseline text-5xl font-normal leading-none tracking-tight tabular-nums md:text-6xl">
-                  <CountUp end={9.8} />
-                  <span className="ml-2 text-2xl font-light text-white/80 md:text-3xl">MW</span>
+                <p className="flex items-baseline text-4xl font-normal leading-none tracking-tight md:text-5xl">
+                  {stats[0]?.value || "9.8 MW"}
                 </p>
-                <p className="mt-3 text-[11px] font-medium tracking-[0.22em] text-white/75 md:text-xs">
-                  LICENSED CAPACITY
+                <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.22em] text-white/75 md:text-xs">
+                  {stats[0]?.label || "LICENSED CAPACITY"}
                 </p>
               </div>
               <span className={iconTile + ' h-12 w-12 shrink-0 hero-float'}>
@@ -256,17 +230,19 @@ export default function Hero() {
             <span className={iconTile + ' h-10 w-10'}>
               <Leaf size={18} />
             </span>
-            <p className="mt-5 text-3xl font-normal leading-none tracking-tight">100%</p>
-            <p className="mt-2 text-[11px] font-medium tracking-[0.22em] text-white/75">RENEWABLE</p>
+            <p className="mt-5 text-3xl font-normal leading-none tracking-tight">{stats[1]?.value || "100%"}</p>
+            <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.22em] text-white/75">
+              {stats[1]?.label || "RENEWABLE"}
+            </p>
           </div>
 
           <div className={card} style={{ animationDelay: '0.75s' }}>
             <span className={iconTile + ' h-10 w-10'}>
-              <Droplets size={18} />
+              <Users size={18} />
             </span>
-            <p className="mt-5 text-3xl font-normal leading-none tracking-tight">Hydro</p>
-            <p className="mt-2 text-[11px] font-medium tracking-[0.22em] text-white/75">
-              NATURAL SOURCE
+            <p className="mt-5 text-3xl font-normal leading-none tracking-tight">{stats[2]?.value || "15,000+"}</p>
+            <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.22em] text-white/75">
+              {stats[2]?.label || "SHAREHOLDERS"}
             </p>
           </div>
 

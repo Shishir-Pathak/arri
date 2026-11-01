@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { NavLink, Link } from "react-router-dom";
 import { Search, Menu, X, Globe } from "lucide-react";
 
-// 👉 Put your logo image in src/assets and update this path/filename
-import logo from "../assets/logo.png";
+// Fallback logo
+import defaultLogo from "../assets/logo.png";
 
-const links = [
+// Fallback links in case the backend is down
+const defaultLinks = [
   { label: "Home", to: "/" },
   { label: "About Us", to: "/about" },
   { label: "Projects", to: "/projects" },
@@ -16,7 +17,7 @@ const links = [
   { label: "Contact Us", to: "/contact" },
 ];
 
-export default function Navbar() {
+export default function Navbar({ site }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -32,12 +33,22 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Process backend navigation data (fixing the /investors route mismatch)
+  const links = site?.navigation?.length > 0
+    ? site.navigation.map(nav => ({
+        label: nav.label === "Investors" ? "Investor Relations" : nav.label,
+        to: nav.url === "/investors" ? "/investor-relations" : nav.url
+      }))
+    : defaultLinks;
+
+  // Use API logo if available, otherwise fallback to local image
+  const logoSrc = site?.logo || defaultLogo;
+
   return (
     <>
-      {/* Spacer: keeps page content from hiding under the fixed navbar (same height as the bar) */}
+      {/* Spacer: keeps page content from hiding under the fixed navbar */}
       <div className="h-[85px] w-full" aria-hidden="true" />
 
-      {/* fixed = always stays at the top while scrolling, no matter what parent wraps it */}
       <header
         className={`nav-drop fixed inset-x-0 top-0 z-50 w-full border-b border-brand/10 bg-gradient-to-r from-[#e9f0fd] via-[#d3e0fb] to-[#b4c9f5] backdrop-blur-md transition-shadow duration-300 ${
           scrolled ? "shadow-lg shadow-navy/15" : "shadow-sm"
@@ -61,16 +72,16 @@ export default function Navbar() {
 
         {/* Main Navbar */}
         <div className="mx-auto flex h-[85px] w-full max-w-[1400px] items-center justify-between px-4 md:px-6 lg:px-10 gap-4">
-          {/* Logo image: shrink-0 ensures it NEVER squishes or hides */}
+          {/* Logo image */}
           <Link to="/" onClick={closeMenu} className="shrink-0">
             <img
-              src={logo}
-              alt="Company logo"
+              src={logoSrc}
+              alt={site?.site_title || "Company logo"}
               className="h-11 w-auto object-contain md:h-12 lg:h-14 transition-transform duration-300 hover:scale-105"
             />
           </Link>
 
-          {/* Desktop Navigation: hidden on mobile, flex on md and up */}
+          {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-1 text-[14px] lg:text-[15px] font-medium text-brand overflow-x-auto">
             {links.map(({ label, to }) => (
               <NavLink
@@ -108,7 +119,7 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Mobile Menu Button: Only shows on very small screens (below md) */}
+          {/* Mobile Menu Button */}
           <button
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -120,7 +131,7 @@ export default function Navbar() {
           </button>
         </div>
 
-        {/* Mobile Menu Dropdown (scrolls if the screen is short) */}
+        {/* Mobile Menu Dropdown */}
         {isMenuOpen && (
           <div className="nav-menu max-h-[calc(100vh-85px)] w-full overflow-y-auto border-t border-brand/10 bg-[#e3ebfc]/95 px-6 pb-6 backdrop-blur-md md:hidden">
             <nav className="flex flex-col">

@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { Routes, Route, useLocation, Link } from "react-router-dom";
 
+import { useApi } from './lib/useApi';
+import { fetchSite } from './lib/endpoints';
+
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
@@ -45,30 +48,24 @@ function ComingSoon() {
 }
 
 export default function App() {
+  // Fetch global site settings (logo, navbar links, footer contact info)
+  const { data: siteData } = useApi(fetchSite);
+
   return (
     <>
       <ScrollToTop />
 
-      <Navbar />
+      {/* Pass the site data to Navbar */}
+      <Navbar site={siteData} />
 
       <main>
         <Routes>
-          <Route
-            path="/"
-            element={<Home />}
-          />
-
-          <Route
-            path="/about"
-            element={<About />}
-          />
-
-          <Route
-            path="*"
-            element={<ComingSoon />}
-          />
-
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="*" element={<ComingSoon />} />
+          
           <Route path="/projects" element={<Projects />} />
+          {/* Note: Your frontend uses /investor-relations but the API navigation returns /investors. We'll handle that in the Navbar. */}
           <Route path="/investor-relations" element={<InvestorRelations />} />
           <Route path="/notices" element={<Notices />} />
           <Route path="/media" element={<Media />} />
@@ -77,7 +74,8 @@ export default function App() {
         </Routes>
       </main>
 
-      <Footer />
+      {/* Pass the site data to Footer */}
+      <Footer site={siteData} />
     </>
   );
 }

@@ -4,55 +4,38 @@ import {
   Newspaper, Camera, Play, Image as ImageIcon, X, Download, FileText, Calendar,
   ExternalLink, Mail, Phone, MapPin, ArrowRight,
 } from 'lucide-react'
+import { useApi } from '../lib/useApi'
+import { fetchNews, fetchGallery, fetchVideos, fetchDocuments } from '../lib/endpoints'
 
-/* ---------------- DATA (edit text here) ---------------- */
+/* ---------------- FALLBACK DATA ---------------- */
 const TBU = 'To be updated'
 
-// date: 'YYYY-MM-DD' (or null) | link: external URL or null | file: '/docs/xyz.pdf' or null
-const news = [
+const fallbackNews = [
   {
     date: '2026-07-14',
     source: 'Company Release',
     title: 'Arris Energy Receives Certificate of Conversion',
     text: 'The Office of the Company Registrar has issued the certificate of conversion of Arris Energy Private Limited into a public limited company.',
     link: null,
-    file: null,
+    file_url: null,
   },
-  {
-    date: '2026-07-13',
-    source: 'Company Release',
-    title: 'Arris Energy Converts to Public Limited Company',
-    text: 'Arris Energy Private Limited has been converted into a public limited company, now known as Arris Energy Limited, to broaden ownership and enable public participation.',
-    link: null,
-    file: null,
-  },
-  { date: null, source: 'Media Coverage', title: 'Media Coverage', text: TBU, link: null, file: null },
-  { date: null, source: 'Interview', title: 'Interview / Feature', text: TBU, link: null, file: null },
 ]
 
-// src: '/gallery/photo1.jpg' (file inside /public/gallery) or null for a placeholder
 const galleryTabs = ['All', 'Project', 'Events', 'Company']
-const gallery = [
-  { category: 'Project', caption: 'Luja Khola Cascade Hydropower Project site', src: null },
-  { category: 'Project', caption: 'Solukhumbu landscape', src: null },
-  { category: 'Project', caption: 'Project works', src: null },
-  { category: 'Events', caption: 'Company event', src: null },
-  { category: 'Events', caption: 'Shareholder meeting', src: null },
-  { category: 'Company', caption: 'Board of Directors', src: null },
+const fallbackGallery = [
+  { category: 'Project', caption: 'Luja Khola Cascade Hydropower Project site', image: null },
+  { category: 'Project', caption: 'Solukhumbu landscape', image: null },
+  { category: 'Events', caption: 'Company event', image: null },
 ]
 
-// url: YouTube / Facebook video link or null
-const videos = [
-  { title: 'Company Introduction', note: TBU, url: null },
-  { title: 'Project Overview', note: TBU, url: null },
-  { title: 'Chairman’s Message', note: TBU, url: null },
+const fallbackVideos = [
+  { title: 'Company Introduction', note: TBU, url: null, thumbnail: null },
+  { title: 'Project Overview', note: TBU, url: null, thumbnail: null },
 ]
 
-const kit = [
-  { title: 'Company Logo (PNG / SVG)', note: TBU, file: null },
-  { title: 'Company Profile', note: 'PDF', file: null },
-  { title: 'Fact Sheet', note: TBU, file: null },
-  { title: 'Project Photo Pack', note: TBU, file: null },
+const fallbackKit = [
+  { title: 'Company Logo (PNG / SVG)', note: TBU, url: null, has_file: false },
+  { title: 'Company Profile', note: 'PDF', url: null, has_file: false },
 ]
 
 const boilerplate =
@@ -82,28 +65,38 @@ const formatDate = (d) =>
     ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     : 'Date to be updated'
 
-const sortedNews = [...news].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-
 /* ---------------- PAGE ---------------- */
 export default function Media() {
   const [tab, setTab] = useState('All')
   const [open, setOpen] = useState(null) // gallery item shown in lightbox
 
-  const photos = useMemo(
-    () => gallery.filter((g) => tab === 'All' || g.category === tab),
-    [tab]
-  )
+  // 1. Fetch News
+  const { data: newsRes } = useApi(() => fetchNews({ ordering: '-date' }))
+  const newsList = newsRes?.results || fallbackNews
+
+  // 2. Fetch Gallery
+  const { data: galleryRes } = useApi(fetchGallery)
+  const galleryList = galleryRes?.results || fallbackGallery
+
+  // 3. Fetch Videos
+  const { data: videosRes } = useApi(fetchVideos)
+  const videoList = videosRes?.results || fallbackVideos
+
+  // 4. Fetch Media Kit Documents
+  const { data: kitRes } = useApi(() => fetchDocuments('media_kit'))
+  const kitList = kitRes || fallbackKit
+
+  // Filter Gallery based on active tab
+  const photos = useMemo(() => {
+    if (tab === 'All') return galleryList;
+    return galleryList.filter((g) => g.category === tab);
+  }, [tab, galleryList]);
 
   return (
     <div className="mx-auto max-w-[1200px] bg-white">
       {/* ===== PAGE BANNER ===== */}
       <section className="relative aspect-[929/155] min-h-[160px] w-full overflow-hidden bg-[#e4eefc]">
-        <svg
-          viewBox="0 0 929 155"
-          preserveAspectRatio="xMaxYMax slice"
-          className="absolute inset-0 h-full w-full"
-          aria-hidden="true"
-        >
+        <svg viewBox="0 0 929 155" preserveAspectRatio="xMaxYMax slice" className="absolute inset-0 h-full w-full" aria-hidden="true">
           <defs>
             <linearGradient id="bannerSkyM" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stopColor="#dbe8fb" />
@@ -169,11 +162,7 @@ export default function Media() {
             [Camera, 'Gallery', '#gallery'],
             [Play, 'Videos', '#videos'],
           ].map(([Icon, label, href]) => (
-            <a
-              key={label}
-              href={href}
-              className="rounded-xl bg-[#f1f6fd] p-4 text-center transition hover:bg-[#e3ecfb]"
-            >
+            <a key={label} href={href} className="rounded-xl bg-[#f1f6fd] p-4 text-center transition hover:bg-[#e3ecfb]">
               <span className="mx-auto grid h-12 w-12 place-items-center rounded-full border-2 border-accent text-accent">
                 <Icon size={22} />
               </span>
@@ -188,12 +177,9 @@ export default function Media() {
         <Label>PRESS &amp; NEWS</Label>
         <h2 className="mt-1 text-2xl font-bold text-brand">Latest News</h2>
         <Bar />
-        <ul className="mt-4">
-          {sortedNews.map((n) => (
-            <li
-              key={n.title + n.date}
-              className="flex flex-col gap-3 border-b border-brand/15 py-4 last:border-0 sm:flex-row sm:items-center"
-            >
+        <ul className="mt-4 min-h-[100px]">
+          {newsList.map((n, index) => (
+            <li key={`${n.title}-${index}`} className="flex flex-col gap-3 border-b border-brand/15 py-4 last:border-0 sm:flex-row sm:items-center">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#e3ecfb] text-brand">
                 <Newspaper size={20} />
               </span>
@@ -212,22 +198,12 @@ export default function Media() {
                 </p>
               </div>
               {n.link && (
-                <a
-                  href={n.link}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 self-start rounded-full bg-[#eef3fc] px-4 py-2 text-[11px] font-semibold tracking-wide text-brand hover:bg-[#e3ecfb] sm:self-center"
-                >
+                <a href={n.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 self-start rounded-full bg-[#eef3fc] px-4 py-2 text-[11px] font-semibold tracking-wide text-brand hover:bg-[#e3ecfb] sm:self-center">
                   READ <ExternalLink size={13} />
                 </a>
               )}
-              {n.file && (
-                <a
-                  href={n.file}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 self-start rounded-full bg-[#eef3fc] px-4 py-2 text-[11px] font-semibold tracking-wide text-brand hover:bg-[#e3ecfb] sm:self-center"
-                >
+              {n.file_url && (
+                <a href={n.file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 self-start rounded-full bg-[#eef3fc] px-4 py-2 text-[11px] font-semibold tracking-wide text-brand hover:bg-[#e3ecfb] sm:self-center">
                   <FileText size={14} /> PDF
                 </a>
               )}
@@ -256,22 +232,20 @@ export default function Media() {
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {photos.map((g) => (
+          {photos.map((g, index) => (
             <button
-              key={g.caption}
+              key={`${g.caption}-${index}`}
               type="button"
-              onClick={() => g.src && setOpen(g)}
-              className={`group overflow-hidden rounded-xl bg-white text-left shadow-sm ${g.src ? 'cursor-zoom-in' : 'cursor-default'}`}
+              onClick={() => g.image && setOpen(g)}
+              className={`group overflow-hidden rounded-xl bg-white text-left shadow-sm ${g.image ? 'cursor-zoom-in' : 'cursor-default'}`}
             >
               <div
                 className="grid aspect-[4/3] place-items-center bg-cover bg-center transition group-hover:scale-[1.02]"
                 style={{
-                  backgroundImage: g.src
-                    ? `url('${g.src}')`
-                    : 'linear-gradient(135deg,#9db8dd,#4d7bb8)',
+                  backgroundImage: g.image ? `url('${g.image}')` : 'linear-gradient(135deg,#9db8dd,#4d7bb8)',
                 }}
               >
-                {!g.src && <ImageIcon size={32} className="text-white/70" />}
+                {!g.image && <ImageIcon size={32} className="text-white/70" />}
               </div>
               <p className="p-3 text-[11px] text-navy/80">
                 <b className="text-brand">{g.category}</b> · {g.caption}
@@ -279,7 +253,6 @@ export default function Media() {
             </button>
           ))}
         </div>
-        {/* Put photos in /public/gallery and set src: '/gallery/photo1.jpg' */}
       </section>
 
       {/* ===== VIDEOS ===== */}
@@ -288,14 +261,18 @@ export default function Media() {
         <h2 className="mt-1 text-2xl font-bold text-brand">Watch Our Story</h2>
         <Bar />
         <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {videos.map((v) => {
+          {videoList.map((v, index) => {
             const Wrapper = v.url ? 'a' : 'div'
             const props = v.url ? { href: v.url, target: '_blank', rel: 'noreferrer' } : {}
             return (
-              <Wrapper key={v.title} {...props} className="group block overflow-hidden rounded-xl shadow-sm">
+              <Wrapper key={`${v.title}-${index}`} {...props} className="group block overflow-hidden rounded-xl shadow-sm">
                 <div
-                  className="grid aspect-video place-items-center"
-                  style={{ backgroundImage: 'linear-gradient(135deg,#2f5cae,#4a78c4)' }}
+                  className="grid aspect-video place-items-center bg-cover bg-center"
+                  style={{ 
+                    backgroundImage: v.thumbnail 
+                      ? `url('${v.thumbnail}')` 
+                      : 'linear-gradient(135deg,#2f5cae,#4a78c4)' 
+                  }}
                 >
                   <span className="grid h-14 w-14 place-items-center rounded-full bg-white/90 text-brand transition group-hover:scale-110">
                     <Play size={24} fill="currentColor" />
@@ -320,12 +297,12 @@ export default function Media() {
           <h2 className="mt-1 text-2xl font-bold text-brand">Resources for Journalists</h2>
           <Bar />
           <div className="mt-5 space-y-3">
-            {kit.map((k) => {
-              const Wrapper = k.file ? 'a' : 'div'
-              const props = k.file ? { href: k.file, download: true } : {}
+            {kitList.map((k, index) => {
+              const Wrapper = k.url ? 'a' : 'div'
+              const props = k.url ? { href: k.url, download: true, target: "_blank", rel: "noreferrer" } : {}
               return (
                 <Wrapper
-                  key={k.title}
+                  key={`${k.title}-${index}`}
                   {...props}
                   className="flex items-center gap-3 rounded-xl bg-[#f1f6fd] p-3 transition hover:bg-[#e3ecfb]"
                 >
@@ -338,7 +315,7 @@ export default function Media() {
                       {k.note}
                     </span>
                   </span>
-                  <Download size={16} className="text-brand" />
+                  {k.url && <Download size={16} className="text-brand" />}
                 </Wrapper>
               )
             })}
@@ -372,10 +349,7 @@ export default function Media() {
         </div>
 
         <div className="mt-8 flex flex-wrap items-center gap-4">
-          <Link
-            to="/notices"
-            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy"
-          >
+          <Link to="/notices" className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy hover:bg-[#e5a840] transition-colors">
             OFFICIAL NOTICES <ArrowRight size={14} />
           </Link>
           <Link to="/projects" className="text-[11px] font-semibold tracking-[0.15em] text-brand hover:underline">
@@ -386,22 +360,12 @@ export default function Media() {
 
       {/* ===== LIGHTBOX ===== */}
       {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4"
-          onClick={() => setOpen(null)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <button
-            type="button"
-            onClick={() => setOpen(null)}
-            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white text-navy"
-            aria-label="Close"
-          >
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" onClick={() => setOpen(null)} role="dialog" aria-modal="true">
+          <button type="button" onClick={() => setOpen(null)} className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white text-navy" aria-label="Close">
             <X size={20} />
           </button>
           <figure className="max-h-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
-            <img src={open.src} alt={open.caption} className="max-h-[80vh] w-auto rounded-lg" />
+            <img src={open.image} alt={open.caption} className="max-h-[80vh] w-auto rounded-lg" />
             <figcaption className="mt-2 text-center text-[12px] text-white">{open.caption}</figcaption>
           </figure>
         </div>

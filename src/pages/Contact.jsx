@@ -4,14 +4,34 @@ import {
   MapPin, Phone, Mail, Clock, Send, CheckCircle2, AlertCircle, ChevronDown, ArrowRight,
   TrendingUp, Newspaper, Briefcase, MessageSquare, Mountain, Loader2, Globe,
 } from 'lucide-react'
+import { useApi } from '../lib/useApi'
+import { fetchFaqs, submitContact } from '../lib/endpoints'
 
-/* ---------------- DATA (edit text here) ---------------- */
+/* ---------------- FALLBACK DATA ---------------- */
 const TBU = 'To be updated'
-const CONTACT_EMAIL = 'energyarris@gmail.com'
 
-// OPTIONAL: paste a Formspree (or similar) endpoint to receive messages directly,
-// e.g. 'https://formspree.io/f/xxxxxxx'. Leave '' to open the visitor's email app instead.
-const FORM_ENDPOINT = ''
+const fallbackFaqs = [
+  {
+    question: 'How can I contact Arris Energy Limited?',
+    answer: 'You can use the form on this page, call our office numbers, or email us. Our registered office is in Kathmandu Metropolitan City, Ward No. 31.',
+  },
+  {
+    question: 'I am a shareholder or investor. Where can I find information?',
+    answer: 'Visit the Investor Relations page for capital structure, governance and documents. For specific queries, select "Investor / Shareholder" in the form.',
+  },
+  {
+    question: 'How do I apply for a job?',
+    answer: 'Open the Careers page to see current openings and apply by email. You can also send your CV for future opportunities.',
+  },
+  {
+    question: 'I am a journalist. Who do I contact?',
+    answer: 'Visit the Media page for news and resources, and select "Media / Press" in the form for interview or information requests.',
+  },
+  {
+    question: 'Where is the project located?',
+    answer: 'The 9.8 MW Luja Khola Cascade Hydropower Project is in Khumbu Pasanglhamu Rural Municipality–2, Solukhumbu District, Koshi Province.',
+  },
+]
 
 const inquiryTypes = [
   'General Inquiry',
@@ -32,29 +52,6 @@ const topics = [
 const hours = [
   ['Sunday – Friday', TBU],
   ['Saturday', TBU],
-]
-
-const faqs = [
-  {
-    q: 'How can I contact Arris Energy Limited?',
-    a: 'You can use the form on this page, call our office numbers, or email us. Our registered office is in Kathmandu Metropolitan City, Ward No. 31.',
-  },
-  {
-    q: 'I am a shareholder or investor. Where can I find information?',
-    a: 'Visit the Investor Relations page for capital structure, governance and documents. For specific queries, select "Investor / Shareholder" in the form.',
-  },
-  {
-    q: 'How do I apply for a job?',
-    a: 'Open the Careers page to see current openings and apply by email. You can also send your CV for future opportunities.',
-  },
-  {
-    q: 'I am a journalist. Who do I contact?',
-    a: 'Visit the Media page for news and resources, and select "Media / Press" in the form for interview or information requests.',
-  },
-  {
-    q: 'Where is the project located?',
-    a: 'The 9.8 MW Luja Khola Cascade Hydropower Project is in Khumbu Pasanglhamu Rural Municipality–2, Solukhumbu District, Koshi Province.',
-  },
 ]
 
 /* ---------------- BANNER SUN RAYS ---------------- */
@@ -107,6 +104,10 @@ export default function Contact() {
   const [openFaq, setOpenFaq] = useState(0)
   const formRef = useRef(null)
 
+  // Fetch FAQs from backend (falls back to default if backend is down)
+  const { data: apiFaqs } = useApi(fetchFaqs)
+  const displayFaqs = apiFaqs?.length > 0 ? apiFaqs : fallbackFaqs
+
   const set = (k) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
     setForm((f) => ({ ...f, [k]: value }))
@@ -131,36 +132,43 @@ export default function Contact() {
 
   const onSubmit = async (ev) => {
     ev.preventDefault()
-    if (form.website) return // honeypot: bots fill this hidden field
+    
+    // Honeypot check - if a bot filled this, silently stop
+    if (form.website) return 
+
+    // Frontend validation
     const e = validate()
     setErrors(e)
     if (Object.keys(e).length) return
 
-    const subject = `[${form.type}] ${form.subject.trim()}`
-    const body =
-      `Name: ${form.name.trim()}\nEmail: ${form.email.trim()}\nPhone: ${form.phone.trim() || '-'}\n` +
-      `Inquiry type: ${form.type}\n\n${form.message.trim()}`
-
-    if (!FORM_ENDPOINT) {
-      window.location.href = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-      setStatus('success')
-      return
-    }
-
     setStatus('sending')
     try {
-      const res = await fetch(FORM_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          name: form.name, email: form.email, phone: form.phone,
-          type: form.type, subject, message: form.message,
-        }),
+      // Send to backend API
+      await submitContact({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        inquiry_type: form.type, // Backend expects inquiry_type
+        subject: form.subject,
+        message: form.message,
+        consent: form.consent,
+        website: form.website,
       })
-      if (!res.ok) throw new Error('Request failed')
       setStatus('success')
-    } catch {
-      setStatus('error')
+    } catch (err) {
+      // Handle backend validation errors
+      if (err.fields && Object.keys(err.fields).length > 0) {
+        const backendErrors = {}
+        Object.keys(err.fields).forEach(key => {
+          // Map backend 'inquiry_type' to frontend 'type'
+          const frontendKey = key === 'inquiry_type' ? 'type' : key
+          backendErrors[frontendKey] = err.fields[key][0]
+        })
+        setErrors(backendErrors)
+        setStatus('idle')
+      } else {
+        setStatus('error')
+      }
     }
   }
 
@@ -302,21 +310,19 @@ export default function Contact() {
               </span>
               <h3 className="mt-4 text-xl font-bold text-navy">Thank you!</h3>
               <p className="mx-auto mt-2 max-w-sm text-[13px] leading-6 text-navy/80">
-                {FORM_ENDPOINT
-                  ? 'Your message has been sent. Our team will get back to you soon.'
-                  : 'Your email app should now be open with your message ready. Please press Send there to complete it. If nothing opened, email us directly at energyarris@gmail.com.'}
+                Your message has been sent successfully. Our team will get back to you soon.
               </p>
               <button
                 type="button"
                 onClick={reset}
-                className="mt-5 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy"
+                className="mt-5 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy hover:bg-[#e5a840] transition-colors"
               >
                 SEND ANOTHER MESSAGE
               </button>
             </div>
           ) : (
             <form onSubmit={onSubmit} noValidate className="mt-6 space-y-4">
-              {/* honeypot (hidden from people) */}
+              {/* honeypot (hidden from humans) */}
               <input
                 type="text"
                 name="website"
@@ -393,7 +399,7 @@ export default function Contact() {
 
               {status === 'error' && (
                 <p className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-[12px] text-red-700">
-                  <AlertCircle size={16} /> Something went wrong. Please try again or email us directly at {CONTACT_EMAIL}.
+                  <AlertCircle size={16} /> Something went wrong. Please try again or email us directly at energyarris@gmail.com.
                 </p>
               )}
 
@@ -448,8 +454,6 @@ export default function Contact() {
             <p className="mt-4 flex items-center gap-2 text-[12px] italic text-navy/50">
               <Globe size={14} /> Social media links: {TBU}
             </p>
-            {/* Add links here, for example:
-                <a href="https://facebook.com/yourpage" target="_blank" rel="noreferrer">Facebook</a> */}
           </div>
         </aside>
       </section>
@@ -467,10 +471,6 @@ export default function Contact() {
             referrerPolicy="no-referrer-when-downgrade"
           />
         </div>
-        <p className="mt-3 text-[11px] text-navy/60">
-          The map shows the general area of Kathmandu Metropolitan City, Ward No. 31. For an exact
-          pin, replace the map address in the code with your full street address or Google Maps embed link.
-        </p>
       </section>
 
       {/* ===== FAQ ===== */}
@@ -479,21 +479,23 @@ export default function Contact() {
         <h2 className="mt-1 text-2xl font-bold text-brand">Frequently Asked Questions</h2>
         <Bar />
         <ul className="mt-5 space-y-3">
-          {faqs.map((f, i) => {
+          {displayFaqs.map((f, i) => {
             const isOpen = openFaq === i
             return (
-              <li key={f.q} className="rounded-xl border border-brand/15">
+              <li key={f.id || i} className="rounded-xl border border-brand/15">
                 <button
                   type="button"
                   onClick={() => setOpenFaq(isOpen ? null : i)}
                   aria-expanded={isOpen}
                   className="flex w-full items-center justify-between gap-4 p-4 text-left"
                 >
-                  <span className="text-[13px] font-semibold text-navy">{f.q}</span>
+                  <span className="text-[13px] font-semibold text-navy">{f.question || f.q}</span>
                   <ChevronDown size={18} className={`shrink-0 text-brand transition ${isOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {isOpen && (
-                  <p className="border-t border-brand/15 px-4 pb-4 pt-3 text-[12px] leading-5 text-navy/80">{f.a}</p>
+                  <p className="border-t border-brand/15 px-4 pb-4 pt-3 text-[12px] leading-5 text-navy/80">
+                    {f.answer || f.a}
+                  </p>
                 )}
               </li>
             )
@@ -507,7 +509,7 @@ export default function Contact() {
         <div className="mt-4 flex flex-wrap items-center gap-4">
           <Link
             to="/investor-relations"
-            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy"
+            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-[11px] font-semibold tracking-[0.15em] text-navy hover:bg-[#e5a840] transition-colors"
           >
             INVESTOR RELATIONS <ArrowRight size={14} />
           </Link>
